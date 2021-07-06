@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<head>
+    <script src="https://pagecdn.io/lib/ace/1.4.12/ace.min.js" crossorigin="anonymous" integrity="sha256-T5QdmsCQO5z8tBAXMrCZ4f3RX8wVdiA0Fu17FGnU1vU="></script>
+    <script src="https://pagecdn.io/lib/ace/1.4.12/theme-twilight.min.js" crossorigin="anonymous"></script>
+    <script src="https://pagecdn.io/lib/ace/1.4.12/snippets/php.min.js" crossorigin="anonymous"></script>
+    <script src="https://pagecdn.io/lib/ace/1.4.12/mode-php.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+    <meta charset="UTF-8">
+    <title>コードエディタ</title>
+</head>
+</meta>
+<html>
+    <body>
+        <div id="app">
+            <v-app v-show="isLogin">
+                <v-app-bar app color="light-blue">
+                    <v-row justify="center" style="height:64px">
+                            <v-img src="LOGO_A2.png" class="mt-2 pa-0" max-height="7vh" max-width="40vw"/>
+                    </v-row>
+                </v-app-bar>
+                <v-main>
+                    <v-container fluid>
+                        <v-row>
+                            <v-col cols="4">
+                                <v-card flat tile outline  style="overflow: scroll;" width="66.6vw" height="calc(100vh - 64px)">
+                                    <v-toolbar dense>
+                                        <v-menu offset-y>
+                                            <template v-slot:activator="{ on, attrs }">
+                                              <v-btn
+                                                icon
+                                                v-bind="attrs"
+                                                v-on="on"
+                                              >
+                                              <v-app-bar-nav-icon></v-app-bar-nav-icon>
+                                              </v-btn>
+                                            </template>
+                                            <v-list>
+                                                <v-list-item @click="preCreateFile('')">
+                                                    <v-list-item-icon><v-icon>mdi-note-plus-outline</v-icon></v-list-item-icon>
+                                                    <v-list-item-title>new file</v-list-item-title>
+                                                </v-list-item>
+                                                <v-list-item @click="preCreateDirectory('')">
+                                                    <v-list-item-icon><v-icon>mdi-folder-plus-outline</v-icon></v-list-item-icon>
+                                                    <v-list-item-title>new folder</v-list-item-title>
+                                                </v-list-item>
+                                                <v-list-item @click="preUpload('')">
+                                                    <v-list-item-icon><v-icon>mdi-arrow-up-bold-circle</v-icon></v-list-item-icon>
+                                                    <v-list-item-title>upload</v-list-item-title>
+                                                </v-list-item>
+                                            </v-list>
+                                        </v-menu>
+                                        <v-spacer></v-spacer>
+                                        <v-btn icon @click="share()">
+                                            <v-icon>mdi-export-variant</v-icon>
+                                        </v-btn>
+                                        <v-btn icon @click="save()">
+                                        <v-icon>mdi-content-save</v-icon>
+                                        </v-btn>
+                                        <v-btn icon @click="run">
+                                        <v-icon>mdi-arrow-right-drop-circle</v-icon>
+                                        </v-btn>
+                                        </v-list>
+                                    </v-toolbar>
+                                    <v-treeview
+                                        v-model="tree"
+                                        :items="dirList"
+                                        activatable
+                                        item-key="path"
+                                        open-on-click
+                                        return-object
+                                        @update:active="getBody"
+                                    >
+                                        <template v-slot:prepend="{ item, open }">
+                                            <v-icon v-if="item.type == 'folder'">
+                                            {{ open ? 'mdi-folder-open' : 'mdi-folder' }}
+                                            </v-icon>
+                                            <v-icon v-else>
+                                            {{ files[item.type] }}
+                                            </v-icon>
+                                        </template>
+                                        <template v-slot:label="{ item, open }">
+                                            {{item.name}}
+                                        </template>
+                                        <template v-slot:append="{ item }">
+                                            <v-menu offset-y>
+                                                <template v-slot:activator="{ on, attrs }">
+                                                  <v-btn
+                                                    icon
+                                                    v-bind="attrs"
+                                                    v-on="on"
+                                                  >
+                                                  <v-app-bar-nav-icon></v-app-bar-nav-icon>
+                                                  </v-btn>
+                                                </template>
+                                                <v-list>
+                                                  <v-list-item v-if="item.type === 'folder'" @click="preCreateFile(item.path)">
+                                                      <v-list-item-icon><v-icon>mdi-note-plus-outline</v-icon></v-list-item-icon>
+                                                      <v-list-item-title>new file</v-list-item-title>
+                                                  </v-list-item>
+                                                  <v-list-item v-if="item.type === 'folder'" @click="preCreateDirectory(item.path)">
+                                                    <v-list-item-icon><v-icon>mdi-folder-plus-outline</v-icon></v-list-item-icon>
+                                                    <v-list-item-title>new folder</v-list-item-title>
+                                                </v-list-item>
+                                                <v-list-item v-if="item.type === 'folder'" @click="preUpload(item.path)">
+                                                    <v-list-item-icon><v-icon>mdi-arrow-up-bold-circle</v-icon></v-list-item-icon>
+                                                    <v-list-item-title>upload</v-list-item-title>
+                                                </v-list-item>
+                                                <v-list-item @click="download(item)" v-if="item.type !== 'folder'">
+                                                    <v-list-item-icon><v-icon>mdi-arrow-down-bold-circle<v-icon></v-list-item-icon>
+                                                    <v-list-item-title>download</v-list-item-title>
+                                                </v-list-item>
+                                                <v-list-item v-if="item.type === 'folder'" @click="preMove(item)">
+                                                    <v-list-item-icon><v-icon>mdi-folder-move-outline<v-icon></v-list-item-icon>
+                                                    <v-list-item-title>move folder</v-list-item-title>
+                                                </v-list-item>
+                                                <v-list-item v-else @click="preMove(item)">
+                                                    <v-list-item-icon><v-icon>mdi-file-move-outline<v-icon></v-list-item-icon>
+                                                    <v-list-item-title>move file</v-list-item-title>
+                                                </v-list-item>
+                                                <v-list-item @click="preRename(item)">
+                                                    <v-list-item-icon><v-icon>mdi-fountain-pen-tip<v-icon></v-list-item-icon>
+                                                    <v-list-item-title>rename</v-list-item-title>
+                                                </v-list-item>
+                                                <v-list-item  @click="preDeleteData(item)">
+                                                    <v-list-item-icon><v-icon>mdi-trash-can-outline<v-icon></v-list-item-icon>
+                                                    <v-list-item-title>delete</v-list-item-title>
+                                                </v-list-item>
+                                            </v-list>
+                                            </v-menu>
+                                        </template>
+                                    </v-treeview>
+                                </v-card>
+                            </v-col>
+                            <v-col cols=8 class="mr-0 pr-0 ">
+                                <div v-if="isImage()" id="img">
+                                    <v-img v-if="isImage()" :src="selectedItem!==null ? selectedItem.path : ''"></v-img>
+                                </div>
+                                <div v-show="!isImage()" id="editor"></div>
+                            </v-col>
+                        </v-row>
+                    </v-container>
+                    <v-dialog v-model="createFileDialog" width="30vw">
+                        <v-card tile style="overflow: hidden;">
+                            <v-card-title class="headline">新しいファイルを作成</v-card-title>
+                            <v-text-field
+                                v-model="inputFileName"
+                                label="File Name"
+                            ></v-text-field>
+                            <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="green darken-1" text @click="createFileDialog = false"
+                              >キャンセル</v-btn
+                            >
+                            <v-btn color="green darken-1" text @click="createFileName"
+                              >作成</v-btn
+                            >
+                          </v-card-actions>
+                        </v-card>
+                      </v-dialog>
+                      <v-dialog v-model="createDirectoryDialog" width="30vw">
+                        <v-card tile style="overflow: hidden;">
+                            <v-card-title class="headline">新しいフォルダを作成</v-card-title>
+                            <v-text-field
+                                v-model="inputDirectoryName"
+                                label="Folder Name"
+                            ></v-text-field>
+                            <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="green darken-1" text @click="createDirectoryDialog = false"
+                              >キャンセル</v-btn
+                            >
+                            <v-btn color="green darken-1" text @click="createDirectoryName"
+                              >作成</v-btn
+                            >
+                          </v-card-actions>
+                        </v-card>
+                      </v-dialog>
+                      <v-dialog v-model="uploadDialog" width="30vw">
+                        <v-card tile style="overflow: hidden;">
+                          <v-card-title class="headline">アップロードしますか？</v-card-title>
+                          <v-file-input v-model="uploadedFile" label="file Upload"></v-file-input>
+                          <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="green darken-1" text @click="uploadDialog = false"
+                              >キャンセル</v-btn
+                            >
+                            <v-btn color="green darken-1" text @click="upload()"
+                              >アップロード</v-btn
+                            >
+                          </v-card-actions>
+                        </v-card>
+                      </v-dialog>
+                    <v-dialog v-if="deleteDialog" v-model="deleteDialog" width="30vw">
+                        <v-card tile style="overflow: hidden;">
+                            <v-card-title class="headline">
+                                <v-icon v-if="selectedItem.type == 'folder'">mdi-folder</v-icon>
+                                <v-icon v-else>{{ files[selectedItem.type] }}</v-icon>
+                                『{{selectedItem.name}}』を削除しますか？
+                            </v-card-title>
+                            <v-card-actions>
+                                <v-spacer></v-spacer>
+                                <v-btn color="green darken-1" text @click="deleteDialog = false"
+                                >キャンセル</v-btn>
+                                <v-btn color="green darken-1" text @click="deleteData"
+                                >削除</v-btn>
+                            </v-card-actions>
+                        </v-card>
+                      </v-dialog>
+                      <v-dialog v-if="moveDialog" v-model="moveDialog" width="30vw">
+                        <v-card tile style="overflow: hidden;">
+                            <v-card-title class="headline">
+                                From: 
+                                <v-icon v-if="selectedItem.type == 'folder'">mdi-folder</v-icon>
+                                <v-icon v-else>{{ files[selectedItem.type] }}</v-icon>
+                                『{{selectedItem.name}}』
+                            </v-card-title>
+                            <v-card-title v-if="moveToDirectory !== null" class="headline">
+                                To: 
+                                <v-icon v-if="moveToDirectory.type == 'folder'">mdi-folder</v-icon>
+                                <v-icon v-else>{{ files[moveToDirectory.type] }}</v-icon>
+                                『{{moveToDirectory.name}}』
+                            </v-card-title>
+                            <v-card-subtitle>移動先を選択してください</v-card-subtitle>
+                            <v-card-text>
+                                <v-list>
+                                    <v-list-item>
+                                        <v-list-item-icon>
+                                            <v-icon>mdi-folder</v-icon>
+                                        </v-list-item-icon>
+                                        <v-list-item-title>ルート</v-list-item-title>
+                                        <v-list-item-icon>
+                                        <v-icon @click="moveToDirectory = {name:'root', path:'../'}">{{moveToDirectory.path==='../' ? 'mdi-radiobox-marked' : 'mdi-radiobox-blank'}}</v-icon>
+                                        </v-list-item-icon>
+                                    </v-list-item>
+                                </v-list>
+                                <v-treeview
+                                        :items="directoryList"
+                                        activatable
+                                        item-key="name"
+                                        open-on-click
+                                        return-object
+                                    >
+                                        <template v-slot:label="{item}">
+                                            <span v-if="item.type!=='folder'"></span>
+                                            <span v-else>{{item.name}}</span>
+                                        </template>
+                                        <template v-slot:prepend="{ item, open }">
+                                            <v-icon v-if="item.type == 'folder'">
+                                            {{ open ? 'mdi-folder-open' : 'mdi-folder' }}
+                                            </v-icon>
+                                        </template>
+                                        <template v-slot:append="{ item }">
+                                            <v-icon @click="moveToDirectory = item">
+                                                {{ item.path===moveToDirectory.path ? 'mdi-radiobox-marked' : 'mdi-radiobox-blank' }}
+                                            </v-icon>
+                                        </template>
+                                    </v-treeview>
+                            </v-card-text>
+                            <v-card-actions>
+                                <v-spacer></v-spacer>
+                                <v-btn color="green darken-1" text @click="moveDialog = false"
+                                >キャンセル</v-btn>
+                                <v-btn color="green darken-1" text @click="moveData"
+                                >移動</v-btn>
+                            </v-card-actions>
+                        </v-card>
+                      </v-dialog>
+                      <v-dialog v-if="renameDialog" v-model="renameDialog" width="30vw">
+                        <v-card tile style="overflow: hidden;">
+                            <v-card-title class="headline">名前を変更</v-card-title>
+                            <v-card-subtitle>oldName: {{selectedItem.name}}</v-card-subtitle>
+                            <v-text-field
+                                v-model="inputFileName"
+                                label="New Name"
+                            ></v-text-field>
+                            <v-card-actions>
+                            <v-spacer></v-spacer>
+                            <v-btn color="green darken-1" text @click="renameDialog = false"
+                              >キャンセル</v-btn
+                            >
+                            <v-btn color="green darken-1" text @click="rename"
+                              >作成</v-btn
+                            >
+                          </v-card-actions>
+                        </v-card>
+                      </v-dialog>
+                    <v-snackbar
+                        v-if="snackbar"
+                        v-model="snackbar"
+                        :color="snackbarColor"
+                        timeout=2000
+                    >
+                        {{ snackMessage }}
+                        <template v-slot:action="{ attrs }">
+                            <v-btn
+                                color="white"
+                                text
+                                v-bind="attrs"
+                                @click="snackbar = false"
+                            >
+                                Close
+                            </v-btn>
+                        </template>
+                    </v-snackbar>
+                </v-main>
+            </v-app>
+            <div v-show="!isLogin">
+                <h1>Loginしてください</h1>
+                <v-btn href="https://portal.tech-base.net/">ポータルサイト</v-btn>
+            </div>
+          </div>
+    </body>
+</html>
+<!-- 本番バージョン、サイズと速度のために最適化されています -->
+<script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+<script>
+    new Vue({
+        el: "#app",
+        vuetify: new Vuetify(),
+        data: {
+            isLogin:false,
+            dirList:[],
+            directoryList:[],
+            itemForShare: null,
+            selectedBody:'',
+            selectedItem:null,
+            selectedPath:'',
+            moveToDirectory:null,
+            inputFileName:'',
+            inputDirectoryName:'',
+            uploadedFile:null,
+            createFileDialog:false,
+            createDirectoryDialog:false,
+            uploadDialog:false,
+            deleteDialog:false,
+            moveDialog:false,
+            renameDialog:false,
+            tree:[],
+            editor: null,
+            snackbar: false,
+            snackMessage: '',
+            snackbarColor: 'white',
+            files: {
+                c: 'mdi-language-c',
+                cc: 'mdi-langage-cpp',
+                cpp: 'mdi-language-cpp',
+                cs: 'mdi-language-csharp',
+                css: 'mdi-language-css3',
+                f: 'mdi-language-fortran',
+                for: 'mdi-language-fortran',
+                go: 'mdi-language-go',
+                rs: 'mdi-language-rust',
+                swift: 'mdi-language-swift',
+                hs: 'mdi-language-haskell',
+                java: 'mdi-language-java',
+                kt: 'mdi-language-kotlin',
+                lua: 'mdi-language-lua',
+                html: 'mdi-language-html5',
+                php: 'mdi-language-php',
+                py: 'mdi-language-python',
+                r: 'mdi-language-r',
+                rb: 'mdi-language-ruby',
+                js: 'mdi-language-javascript',
+                ts: 'mdi-language-typescript',
+                json: 'mdi-code-json',
+                md: 'mdi-language-markdown',
+                pdf: 'mdi-file-pdf',
+                png: 'mdi-file-image',
+                jpg: 'mdi-file-image',
+                gif: 'mdi-gif',
+                bmp: 'mdi-file-image',
+                mp3: 'mdi-file-music',
+                wave: 'mdi-file-music',
+                mp4: 'mdi-movie',
+                json: 'mdi-code-json',
+                txt: 'mdi-file-document-outline',
+                xls: 'mdi-file-excel',
+                xaml: 'mdi-language-xaml',
+            },
+        },
+        methods: {
+            getDirectoryList(){
+                axios.get('getList.php')
+                .then((res)=>{
+                    this.dirList=res.data
+                    const list = JSON.parse(JSON.stringify(this.dirList))
+                    this.directoryList=this.folderOnly(list)
+                }).catch((e)=>{
+                    if(e.response.status==404){
+                        this.snackMessage='APIが見つかりません'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }else{
+                        this.snackMessage='ディレクトリツリーの取得に失敗しました'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }
+                })
+            },
+            getBody(tree){
+                if(tree.length!=0){
+                    this.itemForShare=tree[0]
+                    if(tree[0].type!=='folder'){
+                        const path = tree[0].path
+                            axios.get('getBody.php',{
+                                params:{
+                                    path: path
+                                }
+                            })
+                            .then((res)=>{
+                                this.selectedItem=tree[0]
+                                this.editor?.setValue(res.data)
+                            }).catch((e)=>{
+                                if(e.response.status==400){
+                                    this.snackMessage='API要求に誤りがあります'
+                                    this.snackbarColor="red lighten-1"
+                                    this.snackbar=true
+                                }else if(e.response.status==500){
+                                    this.snackMessage='ファイルの中身を取得できませんでした'
+                                    this.snackbarColor="red lighten-1"
+                                    this.snackbar=true
+                                }else if(e.response.status==404){
+                                    this.snackMessage='APIが見つかりません'
+                                    this.snackbarColor="red lighten-1"
+                                    this.snackbar=true
+                                }
+                            })
+                    }
+                }
+            },
+            download(item){
+                axios.get('getBody.php',{
+                    params:{
+                        path: item.path
+                    }
+                })
+                .then((res)=>{
+                    const blob = new Blob([res.data], { type: "type/plain" });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    document.body.appendChild(a);
+                    a.download = item.name;
+                    a.href = url;
+                    a.click();
+                    a.remove();
+                    URL.revokeObjectURL(url);
+                    this.snackMessage='ダウンロードに成功しました'
+                    this.snackbarColor="green lighten-1"
+                    this.snackbar=true
+                }).catch((e)=>{
+                    if(e.response.status==400){
+                        this.snackMessage='API要求に誤りがあります'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }else if(e.response.status==500){
+                        this.snackMessage='ファイルの中身を取得できませんでした'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }else if(e.response.status==404){
+                        this.snackMessage='APIが見つかりません'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }
+                })
+            },
+            run(){
+                if(this.selectedItem!==null){
+                    window.open(this.selectedItem.path, "_blank");
+                    this.getDirectoryList()
+                }
+            },
+            preCreateFile(path){
+                if(path!==""){
+                    this.selectedPath=path
+                }else{
+                    this.selectedPath=''
+                }
+                this.createFileDialog=true
+            },
+            createFileName(){
+                path='../'
+                if(this.selectedPath!==''){
+                    path=this.selectedPath+'/'
+                }
+                const params = new URLSearchParams()
+                params.append('path', path)
+                params.append('name', this.inputFileName)
+                axios.post('createFile.php',params).then(()=>{
+                    this.getDirectoryList()
+                    this.inputFileName=''
+                    this.createFileDialog=false
+                    this.snackMessage='作成に成功しました'
+                    this.snackbarColor="green lighten-1"
+                    this.snackbar=true
+                }).error((e)=>{
+                    if(e.response.status==400){
+                        this.snackMessage='API要求に誤りがあります'
+                        this.snackbarColor="red lighten-1"
+                        this.createFileDialog=false
+                        this.snackbar=true
+                        this.inputFileName=''
+                    }else if(e.response.status==406){
+                        this.snackMessage=this.inputFileName+' は既に存在します'
+                        this.snackbarColor="red lighten-1"
+                        this.createFileDialog=false
+                        this.snackbar=true
+                        this.inputFileName=''
+                    }else if(e.response.status==500){
+                        this.snackMessage='ファイルの作成に失敗しました'
+                        this.snackbarColor="red lighten-1"
+                        this.createFileDialog=false
+                        this.snackbar=true
+                        this.inputFileName=''
+                    }else if(e.response.status==404){
+                        this.snackMessage='APIが見つかりません'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }
+                })
+            },
+            preCreateDirectory(path){
+                if(path!==""){
+                    this.selectedPath=path
+                }else{
+                    this.selectedPath=''
+                }
+                this.createDirectoryDialog=true
+            },
+            createDirectoryName(){
+                path='../'
+                if(this.selectedPath!==''){
+                    path=this.selectedPath+'/'
+                }
+                const params = new URLSearchParams()
+                params.append('path', path)
+                params.append('name', this.inputDirectoryName)
+                axios.post('createDirectory.php',params).then(()=>{
+                    this.getDirectoryList()
+                    this.inputDirectoryName=''
+                    this.createDirectoryDialog=false
+                    this.snackMessage='作成に成功しました'
+                    this.snackbarColor="green lighten-1"
+                    this.snackbar=true
+                }).catch((e)=>{
+                    if(e.response.status==400){                    
+                        this.inputDirectoryName=''
+                        this.createDirectoryDialog=false
+                        this.snackMessage='API要求に誤りがあります'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }else if(e.response.status==406){
+                        this.createDirectoryDialog=false
+                        this.snackMessage=this.inputDirectoryName+' は既に存在します'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                        this.inputDirectoryName=''
+                    }else if(e.response.status==500){
+                        this.createDirectoryDialog=false
+                        this.snackMessage='ディレクトリの作成に失敗しました'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                        this.inputDirectoryName=''
+                    }else if(e.response.status==404){
+                        this.snackMessage='APIが見つかりません'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }
+                })
+            },
+            preUpload(path){
+                if(path!==""){
+                    this.selectedPath=path
+                }else{
+                    this.selectedPath=''
+                }
+                this.uploadDialog=true
+            },
+            upload() {
+                path='../'
+                if(this.selectedPath!==''){
+                    path=this.selectedPath+'/'
+                }
+                let formData = new FormData()
+                formData.append("file", this.uploadedFile)
+                formData.append("path", path)
+                axios.post("upload.php", formData, {
+                    headers: { "content-type": "multipart/form-data" },
+                })
+                .then((res) => {
+                    this.uploadDialog = false
+                    this.uploadedFile = null
+                    this.getDirectoryList()
+                    this.snackMessage='アップロードに成功しました'
+                    this.snackbarColor="green lighten-1"
+                    this.snackbar=true
+                })
+                .catch((e) => {
+                    if(e.response.status==400){
+                        this.uploadDialog = false
+                        this.uploadedFile = null
+                        this.snackMessage='API要求に誤りがあります'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }else if(e.response.status==406){
+                        this.uploadDialog = false
+                        this.uploadedFile = null
+                        this.snackMessage='既に存在しています'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }else if(e.response.status==500){
+                        this.uploadDialog = false
+                        this.uploadedFile = null
+                        this.snackMessage='アップロードに失敗しました'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }else if(e.response.status==404){
+                        this.snackMessage='APIが見つかりません'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }
+                })
+            },
+            save(){
+                if(this.selectedItem!==null){
+                    const path=this.selectedItem.path
+                    const editor = ace.edit("editor")
+                    const body=editor.getValue()
+                    const params = new URLSearchParams()
+                    params.append('path', path)
+                    params.append('body', body)
+                    axios.post('save.php', params).then(()=>{
+                        this.getDirectoryList()
+                        this.snackMessage='保存に成功しました'
+                        this.snackbarColor="green lighten-1"
+                        this.snackbar=true
+                    }).catch((e)=>{
+                        if(e.response.status==400){
+                            this.snackMessage='API要求に誤りがあります'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                        }else if(e.response.status==406){
+                            this.snackMessage=this.selectedItem.name+' は存在しません'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                        }else if(e.response.status==500){
+                            this.snackMessage='内容の保存に失敗しました'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                        }else if(e.response.status==404){
+                            this.snackMessage='APIが見つかりません'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                        }
+                    })
+                }
+            },
+            preDeleteData(item){
+                this.deleteDialog=true
+                this.selectedItem=item
+            },
+            deleteData(){
+                const isFile = this.selectedItem.type !== 'folder'
+                const params = new URLSearchParams()
+                params.append('path', this.selectedItem.path)
+                params.append('is_file', isFile)
+                axios.post('delete.php', params).then(()=>{
+                    this.deleteDialog=false
+                    this.selectedItem=null
+                    this.getDirectoryList()
+                    this.snackMessage='削除に成功しました'
+                    this.snackbarColor="green lighten-1"
+                    this.snackbar=true
+                }).catch((e)=>{
+                    if(e.response.status==400){
+                        this.deleteDialog=false
+                        this.snackMessage='API要求に誤りがあります'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                        this.selectedItem=null
+                    }else if(e.response.status==406){
+                        this.deleteDialog=false
+                        this.snackMessage=this.selectedItem.name+' は存在しません'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                        this.selectedItem=null
+                    }else if(e.response.status==500){
+                        this.deleteDialog=false
+                        this.snackMessage='削除に失敗しました'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true 
+                        this.selectedItem=null
+                    }else if(e.response.status==404){
+                        this.snackMessage='APIが見つかりません'
+                        this.snackbarColor="red lighten-1"
+                        this.snackbar=true
+                    }
+                })
+            },
+            preMove(item){
+                if(this.directoryList.length>0){
+                    this.moveToDirectory={name:'root', path:'../'}
+                    this.moveDialog=true
+                    this.selectedItem=item
+                }
+            },
+            folderOnly(item){
+                // item.forEach((item)=>{console.log(item.name)})
+                return item.filter(item=>item.type==='folder')
+                    .map((item)=>{
+                        if("children" in item){
+                            item.children=this.folderOnly(item.children)
+                        }
+                        return item
+                    })
+            },
+            moveData(){
+                if(this.selectedItem.path===this.moveToDirectory.path){
+                    this.moveDialog=false
+                    this.snackMessage='移動元と移動先が同じです'
+                    this.snackbarColor="red lighten-1"
+                    this.snackbar=true
+                    this.selectedItem=null
+                }else{
+                    const newPath=this.moveToDirectory.path+'/'+this.selectedItem.name
+                    const params = new URLSearchParams()
+                    params.append('old_path', this.selectedItem.path)
+                    params.append('new_path', newPath)
+                    axios.post('move.php',params).then(()=>{
+                        this.selectedItem=null
+                        this.moveDialog=false
+                        this.getDirectoryList()
+                        this.snackMessage='移動に成功しました'
+                        this.snackbarColor="green lighten-1"
+                        this.snackbar=true
+                    }).catch((e)=>{
+                        if(e.response.status==400){
+                            this.moveDialog=false
+                            this.snackMessage='API要求に誤りがあります'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                            this.selectedItem=null
+                        }else if(e.response.status==406){
+                            this.moveDialog=false
+                            this.snackMessage=this.selectedItem.name+' は既に存在します'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                            this.selectedItem=null
+                        }else if(e.response.status==500){
+                            this.moveDialog=false
+                            this.snackMessage='移動に失敗しました'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                            this.selectedItem=null
+                        }else if(e.response.status==404){
+                            this.snackMessage='APIが見つかりません'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                        }
+                    })
+                }
+            },
+            isImage(){
+                if(this.selectedItem==null){return false}
+                else{
+                    if(this.selectedItem.type=='png'){return true}
+                    if(this.selectedItem.type=='jpg'){return true}
+                    if(this.selectedItem.type=='gif'){return true}
+                    if(this.selectedItem.type=='bmp'){return true}
+                }
+                return false
+            },
+            preRename(item){
+                this.selectedItem=item
+                this.renameDialog=true
+            },  
+            rename(){
+                const params = new URLSearchParams()
+                params.append('old_path',this.selectedItem.path)
+                params.append('new_name', this.inputFileName)
+                    axios.post('rename.php',params).then(()=>{
+                        this.selectedItem=null
+                        this.inputFileName=''
+                        this.renameDialog=false
+                        this.getDirectoryList()
+                        this.snackMessage='名前の変更に成功しました'
+                        this.snackbarColor="green lighten-1"
+                        this.snackbar=true
+                    }).catch((e)=>{
+                        if(e.response.status==400){
+                            this.selectedItem=null
+                            this.inputFileName=''
+                            this.renameDialog=false
+                            this.snackMessage='API要求に誤りがあります'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                        }else if(e.response.status==406){
+                            this.selectedItem=null
+                            this.inputFileName=''
+                            this.renameDialog=false
+                            this.snackMessage=this.selectedItem.name + ' は存在しています'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true   
+                        }else if(e.response.status==500){
+                            this.selectedItem=null
+                            this.inputFileName=''
+                            this.renameDialog=false
+                            this.snackMessage='名前の変更に失敗しました'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true    
+                        }else if(e.response.status==404){
+                            this.snackMessage='APIが見つかりません'
+                            this.snackbarColor="red lighten-1"
+                            this.snackbar=true
+                        }
+                    })
+            },
+            share(){
+                if(this.itemForShare==null){
+                    this.snackMessage='ファイルを選択してください'
+                    this.snackbarColor="red lighten-1"
+                    this.snackbar=true    
+                }else{
+                    if(this.itemForShare.type=='folder'){
+                        const sharePath = this.itemForShare.path+'/'
+                        window.open('show_source.php?&dir='+sharePath, "_blank");
+                    }else{
+                        const sharePath = this.itemForShare.path.slice(0,-this.itemForShare.name.length)
+                        const file = this.itemForShare.name
+                        window.open('show_source.php?file='+file+'&dir='+sharePath, "_blank");
+                    }
+                }
+            }
+        },
+        mounted(){
+            const debug = location.search
+            // ポータルサイトが含まれるか探す正規表現を作る(大文字・小文字を区別しない)
+            const sStr = "^https?://portal.tech-base.net"
+            const rExp = new RegExp( sStr, "i" )
+            if(document.referrer.match(rExp)||debug==='?debug=true'){
+                this.isLogin=true
+                this.editor = ace.edit("editor")
+                this.editor.setFontSize('16pt')
+                this.editor.setTheme("ace/theme/twilight")
+                this.editor.session.setMode("ace/mode/php")
+                this.editor.setOptions({
+                    autoScrollEditorIntoView: true,
+                });
+                this.editor?.setValue(this.selectedBody)
+                this.getDirectoryList()
+                // this.editor.on("change", this.update);
+                this.loading=false
+            }
+        }
+    })
+</script>
+
+<style type="text/css" media="screen">
+    html{
+        overflow: hidden;   
+    }
+    #editor  { 
+        max-width: 66.6vw;
+        height: calc(100vh - 64px);
+        position: absolute;
+        margin: auto 0 0 auto;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+    }
+    #img {
+        max-width: 66.6vw;
+        max-height: calc(100vh - 64px);
+        position: absolute;
+        margin: auto 0 0 auto;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+    }
+</style>
