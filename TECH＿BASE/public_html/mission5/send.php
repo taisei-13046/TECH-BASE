@@ -13,7 +13,7 @@
 	//データベース接続
 	$dsn = 'mysql:dbname=tb230001db;host=localhost';
     $user = 'tb-230001';
-    $password = 'L66myFn9hG';
+    $password = 
     $pdo = new PDO($dsn, $user, $password, array(PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING));
 	$sql = $pdo -> prepare("INSERT INTO post (id, name, contents) VALUES (:id, :name, :contents)");
 	$sql -> bindParam(':id', $id, PDO::PARAM_INT);
