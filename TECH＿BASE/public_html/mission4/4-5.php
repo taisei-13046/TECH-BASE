@@ -1,7 +1,7 @@
 <?php
 	$dsn = 'mysql:dbname=tb230001db;host=localhost';
     $user = 'tb-230001';
-    $password = 'L66myFn9hG';
+    $password = 
     $pdo = new PDO($dsn, $user, $password, array(PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING));
 	$sql = $pdo -> prepare("INSERT INTO tbtest (name, comment) VALUES (:name, :comment)");
 	//変数をバインドする
